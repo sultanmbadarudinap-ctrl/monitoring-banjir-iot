@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Monitoring Banjir IoT</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #121824; color: #ffffff; padding: 30px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        h1 { margin-bottom: 5px; color: #4488ff; font-size: 2rem; text-align: center; }
+        p.subtitle { margin-bottom: 30px; color: #8a99ad; font-size: 0.95rem; text-align: center; }
+        
+        .container { display: flex; gap: 25px; max-width: 1000px; width: 100%; flex-wrap: wrap; justify-content: center; }
+        .card { background: #1e2640; border-radius: 16px; padding: 25px; width: 280px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border: 1px solid #2d385e; transition: transform 0.3s; }
+        .card:hover { transform: translateY(-5px); }
+        .card h3 { font-size: 1.1rem; color: #a0aec0; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
+        .value { font-size: 2.8rem; font-weight: bold; margin-bottom: 5px; color: #fff; }
+        .unit { font-size: 1rem; color: #718096; }
+        
+        /* Pewarnaan Status Dinamis */
+        .status-box { font-size: 1.8rem; font-weight: bold; padding: 10px; border-radius: 8px; margin-top: 10px; background-color: #2d385e; transition: background 0.5s; }
+        .aman { background-color: #27ae60; color: white; }
+        .waspada { background-color: #f39c12; color: white; animation: blink 1.5s infinite; }
+        .bahaya { background-color: #c0392b; color: white; animation: blink 0.8s infinite; }
+        
+        @keyframes blink { 50% { opacity: 0.7; } }
+        @media (max-width: 768px) { .container { flex-direction: column; align-items: center; } .card { width: 100%; } }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+</head>
+<body>
+
+    <h1>SISTEM DETEKSI BANJIR BERBASIS IOT</h1>
+    <p class="subtitle">Data Pemantauan Ketinggian & Debit Air Real-Time via Firebase</p>
+
+    <div class="container">
+        <div class="card">
+            <h3>Jarak Air</h3>
+            <div class="value" id="txt-jarak">0.0</div>
+            <div class="unit">cm</div>
+        </div>
+
+        <div class="card">
+            <h3>Debit Aliran</h3>
+            <div class="value" id="txt-debit">0.0</div>
+            <div class="unit">L/menit</div>
+        </div>
+
+        <div class="card">
+            <h3>Status Siaga</h3>
+            <div id="box-status" class="status-box-default status-box">LOADING</div>
+            <div class="unit" style="margin-top: 15px;">Kondisi Aktual</div>
+        </div>
+    </div>
+
+    <script>
+        // === CONFIG FIREBASE DASHBOARD (SAMAKAN DENGAN DI ESP32) ===
+        const firebaseConfig = {
+            databaseURL: "https://NAMA_PROJECT_ANDA-default-rtdb.firebaseio.com/"
+        };
+        
+        // Inisialisasi Firebase Web
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        // Mengambil referensi path data /monitoring dari Firebase RTDB
+        const dbRef = database.ref('/monitoring');
+
+        // Fungsi Listener Sinkronisasi Data Otomatis saat Ada Perubahan di Database
+        dbRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            if(data) {
+                // Update nilai di elemen HTML
+                document.getElementById('txt-jarak').innerText = data.jarak ? data.jarak.toFixed(1) : "0.0";
+                document.getElementById('txt-debit').innerText = data.debit ? data.debit.toFixed(1) : "0.0";
+                
+                const txtStatus = data.status ? data.status.toUpperCase() : "AMAN";
+                const boxStatus = document.getElementById('box-status');
+                boxStatus.innerText = txtStatus;
+
+                // Mengatur Kelas CSS Status Berdasarkan Data Aktif
+                boxStatus.className = "status-box"; // reset class
+                if (txtStatus === "BAHAYA") {
+                    boxStatus.classList.add('bahaya');
+                } else if (txtStatus === "WASPADA") {
+                    boxStatus.classList.add('waspada');
+                } else {
+                    boxStatus.classList.add('aman');
+                }
+            }
+        });
+    </script>
+</body>
+</html>
