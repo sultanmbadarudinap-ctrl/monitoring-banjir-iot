@@ -10,7 +10,7 @@
         h1 { margin-bottom: 5px; color: #4488ff; font-size: 2rem; text-align: center; }
         p.subtitle { margin-bottom: 30px; color: #8a99ad; font-size: 0.95rem; text-align: center; }
         
-        .container { display: flex; gap: 25px; max-width: 1000px; width: 100%; flex-wrap: wrap; justify-content: center; }
+        .container { display: flex; gap: 25px; max-width: 1000px; width: 100%; flex-wrap: wrap; justify-content: center; margin-bottom: 30px; }
         .card { background: #1e2640; border-radius: 16px; padding: 25px; width: 280px; text-align: center; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border: 1px solid #2d385e; transition: transform 0.3s; }
         .card:hover { transform: translateY(-5px); }
         .card h3 { font-size: 1.1rem; color: #a0aec0; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px; }
@@ -23,8 +23,36 @@
         .waspada { background-color: #f39c12; color: white; animation: blink 1.5s infinite; }
         .bahaya { background-color: #c0392b; color: white; animation: blink 0.8s infinite; }
         
+        /* Desain Panel Kontrol Data & Tabel */
+        .table-container { max-width: 1000px; width: 100%; background: #1e2640; border-radius: 16px; padding: 25px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border: 1px solid #2d385e; }
+        .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
+        .table-header h2 { font-size: 1.4rem; color: #fff; }
+        
+        .btn-group { display: flex; gap: 10px; }
+        button { padding: 10px 18px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.9rem; transition: background 0.2s, transform 0.1s; }
+        button:active { transform: scale(0.98); }
+        .btn-save { background-color: #3498db; color: white; }
+        .btn-save:hover { background-color: #2980b9; }
+        .btn-download { background-color: #2ecc71; color: white; }
+        .btn-download:hover { background-color: #27ae60; }
+        .btn-clear { background-color: #e74c3c; color: white; }
+        .btn-clear:hover { background-color: #c0392b; }
+
+        .table-wrapper { max-height: 400px; overflow-y: auto; border-radius: 8px; border: 1px solid #2d385e; }
+        table { width: 100%; border-collapse: collapse; text-align: left; background-color: #171d33; }
+        th, td { padding: 12px 15px; font-size: 0.95rem; }
+        th { background-color: #2d385e; color: #a0aec0; position: sticky; top: 0; text-transform: uppercase; font-size: 0.85rem; letter-spacing: 0.5px; }
+        tr { border-bottom: 1px solid #2d385e; }
+        tr:hover { background-color: #21294a; }
+        td { color: #e2e8f0; }
+
         @keyframes blink { 50% { opacity: 0.7; } }
-        @media (max-width: 768px) { .container { flex-direction: column; align-items: center; } .card { width: 100%; } }
+        @media (max-width: 768px) { 
+            .container { flex-direction: column; align-items: center; } 
+            .card { width: 100%; }
+            .table-header { flex-direction: column; align-items: stretch; }
+            .btn-group { flex-direction: column; }
+        }
     </style>
 
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -50,47 +78,147 @@
 
         <div class="card">
             <h3>Status Siaga</h3>
-            <div id="box-status" class="status-box-default status-box">LOADING</div>
+            <div id="box-status" class="status-box">LOADING</div>
             <div class="unit" style="margin-top: 15px;">Kondisi Aktual</div>
         </div>
     </div>
 
+    <div class="table-container">
+        <div class="table-header">
+            <h2>Riwayat Data Log Penelitian</h2>
+            <div class="btn-group">
+                <button class="btn-save" onclick="simpanDataManual()">📌 Log Data Aktif</button>
+                <button class="btn-download" onclick="downloadCSV()">📥 Download CSV (Excel)</button>
+                <button class="btn-clear" onclick="hapusRiwayatTabel()">🗑️ Reset</button>
+            </div>
+        </div>
+        
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Waktu Ambil</th>
+                        <th>Jarak Air (cm)</th>
+                        <th>Debit Air (L/m)</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody id="tabel-body">
+                    </tbody>
+            </table>
+        </div>
+    </div>
+
     <script>
-        // === CONFIG FIREBASE DASHBOARD (SAMAKAN DENGAN DI ESP32) ===
+        // Sinyal penampung variabel aktif dari Firebase
+        let jarakSekarang = 0.0;
+        let debitSekarang = 0.0;
+        let statusSekarang = "AMAN";
+
+        // Variabel lokal penyimpan kumpulan data yang di-log
+        let listDataset = [];
+
+        // === CONFIG FIREBASE DASHBOARD (PASTIKAN SUDAH SESUAI) ===
         const firebaseConfig = {
-            databaseURL: "https://NAMA_PROJECT_ANDA-default-rtdb.firebaseio.com/"
+            databaseURL: "https://https://monitoring-banjir-iot-c4f61-default-rtdb.asia-southeast1.firebasedatabase.app/"
         };
         
         // Inisialisasi Firebase Web
         firebase.initializeApp(firebaseConfig);
         const database = firebase.database();
-
-        // Mengambil referensi path data /monitoring dari Firebase RTDB
         const dbRef = database.ref('/monitoring');
 
         // Fungsi Listener Sinkronisasi Data Otomatis saat Ada Perubahan di Database
         dbRef.on('value', (snapshot) => {
             const data = snapshot.val();
             if(data) {
-                // Update nilai di elemen HTML
-                document.getElementById('txt-jarak').innerText = data.jarak ? data.jarak.toFixed(1) : "0.0";
-                document.getElementById('txt-debit').innerText = data.debit ? data.debit.toFixed(1) : "0.0";
+                // Simpan ke variabel global web
+                jarakSekarang = data.jarak ? data.jarak : 0.0;
+                debitSekarang = data.debit ? data.debit : 0.0;
+                statusSekarang = data.status ? data.status.toUpperCase() : "AMAN";
+
+                // Update nilai di elemen Card HTML
+                document.getElementById('txt-jarak').innerText = jarakSekarang.toFixed(1);
+                document.getElementById('txt-debit').innerText = debitSekarang.toFixed(1);
                 
-                const txtStatus = data.status ? data.status.toUpperCase() : "AMAN";
                 const boxStatus = document.getElementById('box-status');
-                boxStatus.innerText = txtStatus;
+                boxStatus.innerText = statusSekarang;
 
                 // Mengatur Kelas CSS Status Berdasarkan Data Aktif
-                boxStatus.className = "status-box"; // reset class
-                if (txtStatus === "BAHAYA") {
+                boxStatus.className = "status-box"; 
+                if (statusSekarang === "BAHAYA") {
                     boxStatus.classList.add('bahaya');
-                } else if (txtStatus === "WASPADA") {
+                } else if (statusSekarang === "WASPADA") {
                     boxStatus.classList.add('waspada');
                 } else {
                     boxStatus.classList.add('aman');
                 }
             }
         });
+
+        // 📌 Fungsi Log Data (Menyimpan data aktual yang tampil ke dalam tabel antrean)
+        function simpanDataManual() {
+            // Ambil waktu lokal laptop saat tombol diklik
+            const waktuLokal = new Date().toLocaleTimeString('id-ID');
+
+            // Susun struktur data objek tunggal
+            const barisData = {
+                waktu: waktuLokal,
+                jarak: jarakSekarang.toFixed(1),
+                debit: debitSekarang.toFixed(1),
+                status: statusSekarang
+            };
+
+            // Masukkan ke array penampung dataset download
+            listDataset.push(barisData);
+
+            // Tampilkan ke elemen tabel HTML (Menambahkan baris baru di posisi teratas)
+            const tabelBody = document.getElementById('tabel-body');
+            const barisHTML = `<tr>
+                <td>${barisData.waktu}</td>
+                <td>${barisData.jarak}</td>
+                <td>${barisData.debit}</td>
+                <td>${barisData.status}</td>
+            </tr>`;
+            tabelBody.innerHTML = barisHTML + tabelBody.innerHTML;
+        }
+
+        // 📥 Fungsi Mengonversi Array Dataset Menjadi File CSV dan Men-download-nya
+        function downloadCSV() {
+            if (listDataset.length === 0) {
+                alert("Tabel riwayat masih kosong kawan! Klik tombol 'Log Data Aktif' beberapa kali terlebih dahulu.");
+                return;
+            }
+
+            // Atur header kolom di file excel
+            let isiCSV = "Waktu,Jarak Air (cm),Debit Air (L/m),Status Siaga\n";
+
+            // Iterasi menggabungkan baris data array menjadi teks string CSV
+            listDataset.forEach(row => {
+                isiCSV += `${row.waktu},${row.jarak},${row.debit},${row.status}\n`;
+            });
+
+            // Logika download file instan di browser
+            const blobBerkas = new Blob([isiCSV], { type: 'text/csv;charset=utf-8;' });
+            const linkDownload = document.createElement("a");
+            const urlBerkas = URL.createObjectURL(blobBerkas);
+            
+            linkDownload.setAttribute("href", urlBerkas);
+            linkDownload.setAttribute("download", "Dataset_Banjir_IoT_Sultan.csv");
+            linkDownload.style.visibility = 'hidden';
+            
+            document.body.appendChild(linkDownload);
+            linkDownload.click();
+            document.body.removeChild(linkDownload);
+        }
+
+        // 🗑️ Fungsi Reset Tabel Riwayat
+        function hapusRiwayatTabel() {
+            if(confirm("Apakah Anda yakin ingin mengosongkan semua riwayat log data di tabel?")) {
+                listDataset = [];
+                document.getElementById('tabel-body').innerHTML = "";
+            }
+        }
     </script>
 </body>
 </html>
