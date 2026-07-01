@@ -27,6 +27,7 @@
         .table-container { max-width: 1000px; width: 100%; background: #1e2640; border-radius: 16px; padding: 25px; box-shadow: 0 8px 24px rgba(0,0,0,0.3); border: 1px solid #2d385e; }
         .table-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px; }
         .table-header h2 { font-size: 1.4rem; color: #fff; }
+        .timer-badge { background: #2d385e; padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; color: #4488ff; font-weight: bold; margin-left: 10px; border: 1px solid #4488ff; }
         
         .btn-group { display: flex; gap: 10px; }
         button { padding: 10px 18px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 0.9rem; transition: background 0.2s, transform 0.1s; }
@@ -85,9 +86,11 @@
 
     <div class="table-container">
         <div class="table-header">
-            <h2>Riwayat Data Log Penelitian</h2>
+            <div>
+                <h2>Riwayat Data Log Penelitian <span class="timer-badge">Auto Log: 1 Menit</span></h2>
+            </div>
             <div class="btn-group">
-                <button class="btn-save" onclick="simpanDataManual()">📌 Log Data Aktif</button>
+                <button class="btn-save" onclick="simpanDataManual()">📌 Log Manual Sekarang</button>
                 <button class="btn-download" onclick="downloadCSV()">📥 Download CSV (Excel)</button>
                 <button class="btn-clear" onclick="hapusRiwayatTabel()">🗑️ Reset</button>
             </div>
@@ -118,9 +121,9 @@
         // Variabel lokal penyimpan kumpulan data yang di-log
         let listDataset = [];
 
-        // === CONFIG FIREBASE DASHBOARD (PASTIKAN SUDAH SESUAI) ===
+        // === CONFIG FIREBASE DASHBOARD (TEMPELKAN URL ASLI ANDA DI SINI) ===
         const firebaseConfig = {
-            databaseURL: "https://https://monitoring-banjir-iot-c4f61-default-rtdb.asia-southeast1.firebasedatabase.app/"
+            databaseURL: "https://monitoring-banjir-iot-c4f61-default-rtdb.asia-southeast1.firebasedatabase.app/"
         };
         
         // Inisialisasi Firebase Web
@@ -158,7 +161,7 @@
 
         // 📌 Fungsi Log Data (Menyimpan data aktual yang tampil ke dalam tabel antrean)
         function simpanDataManual() {
-            // Ambil waktu lokal laptop saat tombol diklik
+            // Ambil waktu lokal laptop saat fungsi dipicu
             const waktuLokal = new Date().toLocaleTimeString('id-ID');
 
             // Susun struktur data objek tunggal
@@ -183,10 +186,21 @@
             tabelBody.innerHTML = barisHTML + tabelBody.innerHTML;
         }
 
+        // ⏱️ =========================================================
+        // FITUR OTOMATIS: MENYIMPAN DATA TIAP 1 MENIT (60000 milidetik)
+        // =========================================================
+        setInterval(() => {
+            // Memanggil fungsi simpan data otomatis jika status pemuatan awal sudah aman
+            if(jarakSekarang !== 0.0 || debitSekarang !== 0.0) {
+                simpanDataManual();
+                console.log("Data berhasil direkam otomatis per menit.");
+            }
+        }, 60000); 
+
         // 📥 Fungsi Mengonversi Array Dataset Menjadi File CSV dan Men-download-nya
         function downloadCSV() {
             if (listDataset.length === 0) {
-                alert("Tabel riwayat masih kosong kawan! Klik tombol 'Log Data Aktif' beberapa kali terlebih dahulu.");
+                alert("Tabel riwayat masih kosong kawan! Biarkan berjalan beberapa menit atau klik tombol log manual.");
                 return;
             }
 
@@ -204,7 +218,7 @@
             const urlBerkas = URL.createObjectURL(blobBerkas);
             
             linkDownload.setAttribute("href", urlBerkas);
-            linkDownload.setAttribute("download", "Dataset_Banjir_IoT_Sultan.csv");
+            linkDownload.setAttribute("download", "Dataset_Banjir_Per_Menit.csv");
             linkDownload.style.visibility = 'hidden';
             
             document.body.appendChild(linkDownload);
