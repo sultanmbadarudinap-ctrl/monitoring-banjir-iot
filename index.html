@@ -9,10 +9,10 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <style>
-        /* 1. MENGUBAH WARNA LATAR BELAKANG HALAMAN UTAMA MENJADI BIRU MUDA */
+        /* 1. WARNA LATAR BELAKANG HALAMAN UTAMA (BIRU MUDA) */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #e3f2fd; /* Biru muda yang lembut dan adem di mata */
+            background-color: #e3f2fd; /* Biru muda lembut */
             margin: 0;
             padding: 25px;
             color: #333;
@@ -39,7 +39,7 @@
             margin: 5px 0 0 0;
         }
 
-        /* Desain Grid Kotak Monitoring Data Real-time */
+        /* Grid Kotak Monitoring Data Real-time */
         .grid-monitoring {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -71,27 +71,53 @@
             color: #0288d1;
         }
 
-        /* 2. MENGUBAH BAGIAN WADAH RIWAYAT MENJADI WARNA PUTIH */
+        /* 2. WADAH BAGIAN RIWAYAT (WARNA PUTIH) */
         .riwayat-section {
-            background-color: #ffffff; /* Sesuai request: Berwarna Putih */
+            background-color: #ffffff; /* Berwarna Putih */
             padding: 30px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
             border: 1px solid #e0e0e0;
         }
 
-        .riwayat-section h2 {
-            margin-top: 0;
-            color: #0d47a1;
+        .riwayat-header-flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             border-bottom: 2px solid #e3f2fd;
             padding-bottom: 12px;
+            margin-bottom: 15px;
+        }
+
+        .riwayat-section h2 {
+            margin: 0;
+            color: #0d47a1;
             font-size: 1.5rem;
+        }
+
+        /* DESAIN TOMBOL UNDUH CSV */
+        .btn-download {
+            background-color: #2e7d32; /* Hijau segar */
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-download:hover {
+            background-color: #1b5e20; /* Hijau lebih gelap saat disentuh mouse */
         }
 
         /* Desain Tabel Log Data */
         .table-responsive {
             overflow-x: auto;
-            margin-top: 15px;
         }
 
         table {
@@ -134,15 +160,19 @@
                 <p id="txtDebit">--- L/m</p>
             </div>
             <div class="card">
-                <h3>Status Kebencanaan</h3>
+                <h3>Status Bencana</h3> 
                 <p id="txtStatus" style="color: #757575;">MENCARI...</p>
             </div>
         </div>
 
         <div class="riwayat-section">
-            <h2>Riwayat Aktivitas Log (Tanpa Delay)</h2>
+            <div class="riwayat-header-flex">
+                <h2>Riwayat Data Monitoring</h2>
+                <button class="btn-download" onclick="downloadCSV()">📊 Unduh Data CSV</button>
+            </div>
+            
             <div class="table-responsive">
-                <table>
+                <table id="tabelDataBanjir">
                     <thead>
                         <tr>
                             <th>Waktu Transmisi</th>
@@ -203,7 +233,7 @@
                 // --- B. STRUKTUR FORMAT WAKTU OPERASIONAL (JAM LOKAL) ---
                 const sekarang = new Date();
                 const jam = sekarang.getHours().toString().padStart(2, '0');
-                const menit = sekarang.getMinutes().toString().padStart(2, '0');
+                const menit = window.arrows = sekarang.getMinutes().toString().padStart(2, '0');
                 const detik = sekarang.getSeconds().toString().padStart(2, '0');
                 const waktuFormat = `${jam}:${menit}:${detik}`;
 
@@ -234,6 +264,37 @@
                 }
             }
         });
+
+        // ====================================================================
+        // FUNGSI UNTUK MENGEKSPOR DAN MEN-DOWNLOAD TABEL MENJADI FILE CSV
+        // ====================================================================
+        function downloadCSV() {
+            let csv = [];
+            // Mengambil semua baris yang ada di dalam tabel data banjir
+            let rows = document.querySelectorAll("#tabelDataBanjir tr");
+            
+            for (let i = 0; i < rows.length; i++) {
+                let row = [], cols = rows[i].querySelectorAll("td, th");
+                
+                for (let j = 0; j < cols.length; j++) {
+                    // Bersihkan teks dari koma internal agar format CSV tidak berantakan
+                    let dataTeks = cols[j].innerText.replace(/,/g, '.');
+                    row.push(dataTeks);
+                }
+                csv.push(row.join(","));
+            }
+
+            // Membuat file download dan memicu klik otomatis di browser
+            let csvContent = "data:text/csv;charset=utf-8," + csv.join("\n");
+            let encodedUri = encodeURI(csvContent);
+            let link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "dataset_banjir_unib.csv");
+            document.body.appendChild(link);
+            
+            link.click(); // Eksekusi download file
+            document.body.removeChild(link);
+        }
     </script>
 </body>
 </html>
