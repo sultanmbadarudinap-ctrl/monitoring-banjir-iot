@@ -112,13 +112,12 @@
             margin-bottom: 15px;
         }
 
-        .riwayat-section h2 {
-            margin: 0;
-            color: #0d47a1;
-            font-size: 1.5rem;
+        .riwayat-header-tombol {
+            display: flex;
+            gap: 10px;
         }
 
-        /* DESAIN TOMBOL UNDUH CSV */
+        /* DESAIN TOMBOL INTERAKTIF */
         .btn-download {
             background-color: #2e7d32; /* Hijau segar */
             color: white;
@@ -136,6 +135,25 @@
 
         .btn-download:hover {
             background-color: #1b5e20; /* Hijau lebih gelap saat disentuh mouse */
+        }
+
+        .btn-delete {
+            background-color: #d32f2f; /* Merah tegas */
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-delete:hover {
+            background-color: #c62828; /* Merah lebih gelap saat disentuh mouse */
         }
 
         /* Desain Tabel Log Data */
@@ -203,7 +221,7 @@
         </div>
 
         <!-- SUB-SEKSI PREDIKSI ESTIMASI KOMPUTASI ANN -->
-        <div class="seksi-judul"> Hasil Prediksi Komputasi ANN (15 Menit ke Depan)</div>
+        <div class="seksi-judul">🔮 Hasil Prediksi Komputasi ANN (15 Menit ke Depan)</div>
         <div class="grid-monitoring">
             <div class="card card-prediksi">
                 <h3>Estimasi Jarak Air</h3>
@@ -222,7 +240,10 @@
         <div class="riwayat-section">
             <div class="riwayat-header-flex">
                 <h2>Riwayat Log Gabungan &amp; Estimasi</h2>
-                <button class="btn-download" onclick="downloadCSV()">📊 Unduh Data CSV</button>
+                <div class="riwayat-header-tombol">
+                    <button class="btn-download" onclick="downloadCSV()">📊 Unduh Data CSV</button>
+                    <button class="btn-delete" onclick="hapusSemuaRiwayat()">🗑️ Hapus Riwayat Data</button>
+                </div>
             </div>
             
             <div class="table-responsive">
@@ -398,18 +419,37 @@
         }
 
         // ====================================================================
-        // EVENT LISTENER DUA ARAH (CHILD_ADDED & CHILD_CHANGED)
+        // EVENT LISTENER DUA ARAH & LOADING DATA HISTORIS (MEMUAT 20 DATA TERAKHIR)
         // ====================================================================
+        const referensiData = db.ref('/riwayat_monitoring').limitToLast(20);
         
-        // 1. Mendeteksi masuknya Transaksi Data Baru dari ESP32-S3
-        db.ref('/riwayat_monitoring').limitToLast(1).on('child_added', (snapshot) => {
+        // 1. Mendeteksi masuknya Transaksi Data Baru & memuat riwayat tersimpan saat halaman dibuka
+        referensiData.on('child_added', (snapshot) => {
             perbaruiTampilanWeb(snapshot.key, snapshot.val(), false);
         });
 
         // 2. Mendeteksi Update Prediksi ANN dari Google Colab (Mencegah Lagging Tampilan!)
-        db.ref('/riwayat_monitoring').limitToLast(1).on('child_changed', (snapshot) => {
+        referensiData.on('child_changed', (snapshot) => {
             perbaruiTampilanWeb(snapshot.key, snapshot.val(), true);
         });
+
+        // ====================================================================
+        // FUNGSI KHUSUS UNTUK MENGHAPUS SELURUH RIWAYAT DI FIREBASE
+        // ====================================================================
+        function hapusSemuaRiwayat() {
+            const konfirmasi = confirm("⚠️ PERINGATAN! Apakah Anda yakin ingin menghapus SELURUH data riwayat monitoring di Firebase secara permanen?");
+            
+            if (konfirmasi) {
+                db.ref('/riwayat_monitoring').remove()
+                    .then(() => {
+                        alert("🗑️ Sukses: Seluruh data riwayat di Firebase telah dihapus.");
+                        document.getElementById("bodyTabelRiwayat").innerHTML = "";
+                    })
+                    .catch((error) => {
+                        alert("❌ Gagal menghapus data: " + error.message);
+                    });
+            }
+        }
 
         // ====================================================================
         // FUNGSI UNTUK MENGEKSPOR DAN MEN-DOWNLOAD TABEL MENJADI FILE CSV
