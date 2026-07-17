@@ -19,7 +19,7 @@
         }
 
         .container {
-            max-width: 1000px;
+            max-width: 1200px; /* Diperlebar agar memuat tabel komprehensif */
             margin: 0 auto;
         }
 
@@ -39,33 +39,56 @@
             margin: 5px 0 0 0;
         }
 
+        /* Seksi Judul Kelompok Grid */
+        .seksi-judul {
+            font-size: 1.1rem;
+            color: #0d47a1;
+            font-weight: bold;
+            margin: 15px 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-left: 4px solid #0d47a1;
+            padding-left: 8px;
+        }
+
         /* Grid Kotak Monitoring Data Real-time */
         .grid-monitoring {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
             margin-bottom: 30px;
         }
 
         .card {
             background-color: #ffffff;
-            padding: 20px;
+            padding: 15px;
             border-radius: 12px;
             box-shadow: 0 4px 10px rgba(0, 0, 0, 0.04);
             text-align: center;
             border: 1px solid #bbdefb;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        /* Pembeda visual kartu prediksi ANN */
+        .card-prediksi {
+            border: 1px dashed #0288d1;
+            background-color: #f1f8e9; /* Background hijau sangat muda tipis */
         }
 
         .card h3 {
             margin: 0 0 10px 0;
             color: #546e7a;
-            font-size: 1.1rem;
+            font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         .card p {
-            font-size: 2.3rem;
+            font-size: 1.8rem;
             font-weight: bold;
             margin: 0;
             color: #0288d1;
@@ -126,19 +149,31 @@
         }
 
         th, td {
-            padding: 14px 12px;
-            text-align: left;
-            border-bottom: 1px solid #f0f0f0;
+            padding: 12px 10px;
+            text-align: center; /* Diposisikan di tengah agar seimbang */
+            border-bottom: 1px solid #e0e0e0;
+            font-size: 0.9rem;
         }
 
         th {
             background-color: #f8f9fa;
-            color: #546e7a;
-            font-weight: 600;
+            color: #37474f;
+            font-weight: bold;
+            border: 1px solid #e0e0e0;
+        }
+
+        /* Pembeda visual warna header kolom prediksi */
+        th.header-prediksi {
+            background-color: #e8f5e9;
+            color: #1b5e20;
+        }
+
+        td.kolom-prediksi {
+            background-color: #fafdfa;
         }
 
         tr:hover {
-            background-color: #fbfbfb;
+            background-color: #f5f5f5;
         }
     </style>
 </head>
@@ -150,6 +185,8 @@
             <p>Data Monitoring Real-time Terintegrasi Cloud Firebase</p>
         </header>
 
+        <!-- SUB-SEKSI REAL-TIME INSTRUMEN AKTUAL SENSOR -->
+        <div class="seksi-judul">📊 Data Aktual Sensor (Detik Ini)</div>
         <div class="grid-monitoring">
             <div class="card">
                 <h3>Ketinggian Air</h3>
@@ -165,24 +202,51 @@
             </div>
         </div>
 
+        <!-- SUB-SEKSI PREDIKSI ESTIMASI KOMPUTASI ANN -->
+        <div class="seksi-judul">🔮 Hasil Prediksi Komputasi ANN (15 Menit ke Depan)</div>
+        <div class="grid-monitoring">
+            <div class="card card-prediksi">
+                <h3>Estimasi Jarak Air</h3>
+                <p id="txtPrediksiJarak" style="color: #2e7d32;">--- cm</p>
+            </div>
+            <div class="card card-prediksi">
+                <h3>Estimasi Debit Aliran</h3>
+                <p id="txtPrediksiDebit" style="color: #2e7d32;">--- L/m</p>
+            </div>
+            <div class="card card-prediksi">
+                <h3>Estimasi Status Siaga</h3> 
+                <p id="txtPrediksiStatus" style="color: #757575;">MENCARI...</p>
+            </div>
+        </div>
+
         <div class="riwayat-section">
             <div class="riwayat-header-flex">
-                <h2>Riwayat Data Monitoring</h2>
+                <h2>Riwayat Log Gabungan &amp; Estimasi</h2>
                 <button class="btn-download" onclick="downloadCSV()">📊 Unduh Data CSV</button>
             </div>
             
             <div class="table-responsive">
                 <table id="tabelDataBanjir">
                     <thead>
+                        <!-- Baris Grup Header Utama -->
                         <tr>
-                            <th>Waktu Transmisi</th>
+                            <th rowspan="2">Waktu Transmisi</th>
+                            <th colspan="3">DATA AKTUAL SENSOR (SEKARANG)</th>
+                            <th colspan="3" class="header-prediksi">PREDIKSI TRIPLE-MODEL ANN (15 MENIT KE DEPAN)</th>
+                        </tr>
+                        <!-- Baris Sub-Header Detail Kolom -->
+                        <tr>
                             <th>Ketinggian Air (Jarak)</th>
                             <th>Debit Aliran</th>
                             <th>Status Siaga</th>
+                            <th class="header-prediksi">Estimasi Jarak</th>
+                            <th class="header-prediksi">Estimasi Debit</th>
+                            <th class="header-prediksi">Estimasi Status</th>
                         </tr>
                     </thead>
                     <tbody id="bodyTabelRiwayat">
-                        </tbody>
+                        <!-- Baris Data Akan Masuk Lewat Javascript Secara Dinamis -->
+                    </tbody>
                 </table>
             </div>
         </div>
@@ -213,7 +277,7 @@
             const data = snapshot.val();
             
             if (data) {
-                // --- A. UPDATE TAMPILAN ELEMEN CARD SECARA REAL-TIME ---
+                // --- A1. UPDATE TAMPILAN KARTU DATA AKTUAL SENSOR ---
                 if(document.getElementById("txtJarak")) {
                     document.getElementById("txtJarak").innerText = data.jarak == -1.0 ? "--- cm" : data.jarak.toFixed(1) + " cm";
                 }
@@ -230,10 +294,33 @@
                     else { elStatus.style.color = "#757575"; }
                 }
 
+                // --- A2. UPDATE TAMPILAN KARTU PREDIKSI ANN ---
+                const elPredJarak = document.getElementById("txtPrediksiJarak");
+                const elPredDebit = document.getElementById("txtPrediksiDebit");
+                const elPredStatus = document.getElementById("txtPrediksiStatus");
+
+                if (elPredJarak) {
+                    elPredJarak.innerText = (data.prediksi_jarak !== undefined) ? data.prediksi_jarak.toFixed(1) + " cm" : "Sedang Komputasi...";
+                }
+                if (elPredDebit) {
+                    elPredDebit.innerText = (data.prediksi_debit !== undefined) ? data.prediksi_debit.toFixed(1) + " L/m" : "Sedang Komputasi...";
+                }
+                if (elPredStatus) {
+                    if (data.prediksi_status !== undefined) {
+                        elPredStatus.innerText = data.prediksi_status;
+                        if (data.prediksi_status === "BAHAYA") { elPredStatus.style.color = "red"; }
+                        else if (data.prediksi_status === "WASPADA") { elPredStatus.style.color = "orange"; }
+                        else if (data.prediksi_status === "AMAN") { elPredStatus.style.color = "green"; }
+                    } else {
+                        elPredStatus.innerText = "MEMPROSES...";
+                        elPredStatus.style.color = "#757575";
+                    }
+                }
+
                 // --- B. STRUKTUR FORMAT WAKTU OPERASIONAL (JAM LOKAL) ---
                 const sekarang = new Date();
                 const jam = sekarang.getHours().toString().padStart(2, '0');
-                const menit = window.arrows = sekarang.getMinutes().toString().padStart(2, '0');
+                const menit = sekarang.getMinutes().toString().padStart(2, '0');
                 const detik = sekarang.getSeconds().toString().padStart(2, '0');
                 const waktuFormat = `${jam}:${menit}:${detik}`;
 
@@ -243,15 +330,18 @@
                 if (tabel) {
                     const barisBaru = tabel.insertRow(0); // Tambah data di baris teratas
 
-                    // Isi Kolom Tabel
+                    // 1. Kolom Waktu Transmisi
                     barisBaru.insertCell(0).innerText = waktuFormat;
+                    
+                    // 2. Kolom Ketinggian Aktual
                     barisBaru.insertCell(1).innerText = data.jarak == -1.0 ? "--- cm (Blind Spot)" : data.jarak.toFixed(1) + " cm";
+                    
+                    // 3. Kolom Debit Aktual
                     barisBaru.insertCell(2).innerText = data.debit.toFixed(1) + " L/menit";
                     
+                    // 4. Kolom Status Aktual
                     const cellStatus = barisBaru.insertCell(3);
                     cellStatus.innerText = data.status;
-                    
-                    // Modifikasi Style Warna Status di Tabel Riwayat
                     if (data.status === "BAHAYA") { 
                         cellStatus.style.color = "red"; 
                         cellStatus.style.fontWeight = "bold";
@@ -260,6 +350,30 @@
                         cellStatus.style.fontWeight = "bold";
                     } else { 
                         cellStatus.style.color = "green"; 
+                    }
+
+                    // 5. Kolom Estimasi Jarak ANN (Prediksi)
+                    const cellPredJarakCol = barisBaru.insertCell(4);
+                    cellPredJarakCol.className = "kolom-prediksi";
+                    cellPredJarakCol.innerText = (data.prediksi_jarak !== undefined) ? data.prediksi_jarak.toFixed(1) + " cm" : "Menghitung...";
+
+                    // 6. Kolom Estimasi Debit ANN (Prediksi)
+                    const cellPredDebitCol = barisBaru.insertCell(5);
+                    cellPredDebitCol.className = "kolom-prediksi";
+                    cellPredDebitCol.innerText = (data.prediksi_debit !== undefined) ? data.prediksi_debit.toFixed(1) + " L/menit" : "Menghitung...";
+
+                    // 7. Kolom Estimasi Status ANN (Prediksi)
+                    const cellPredStatusCol = barisBaru.insertCell(6);
+                    cellPredStatusCol.className = "kolom-prediksi";
+                    if (data.prediksi_status !== undefined) {
+                        cellPredStatusCol.innerText = data.prediksi_status;
+                        cellPredStatusCol.style.fontWeight = "bold";
+                        if (data.prediksi_status === "BAHAYA") { cellPredStatusCol.style.color = "red"; }
+                        else if (data.prediksi_status === "WASPADA") { cellPredStatusCol.style.color = "orange"; }
+                        else { cellPredStatusCol.style.color = "green"; }
+                    } else {
+                        cellPredStatusCol.innerText = "Antre CPU...";
+                        cellPredStatusCol.style.color = "#757575";
                     }
                 }
             }
@@ -270,29 +384,27 @@
         // ====================================================================
         function downloadCSV() {
             let csv = [];
-            // Mengambil semua baris yang ada di dalam tabel data banjir
             let rows = document.querySelectorAll("#tabelDataBanjir tr");
             
-            for (let i = 0; i < rows.length; i++) {
+            // Loop baris tabel (Mulai indeks ke-1 agar mengabaikan header grup bertingkat agar rapi)
+            for (let i = 1; i < rows.length; i++) {
                 let row = [], cols = rows[i].querySelectorAll("td, th");
                 
                 for (let j = 0; j < cols.length; j++) {
-                    // Bersihkan teks dari koma internal agar format CSV tidak berantakan
-                    let dataTeks = cols[j].innerText.replace(/,/g, '.');
+                    let dataTeks = cols[j].innerText.replace(/,/g, '.').trim();
                     row.push(dataTeks);
                 }
                 csv.push(row.join(","));
             }
 
-            // Membuat file download dan memicu klik otomatis di browser
-            let csvContent = "data:text/csv;charset=utf-8," + csv.join("\n");
+            let csvContent = "data:text/csv;charset=utf-8,Waktu_Transmisi,Jarak_Aktual,Debit_Aktual,Status_Aktual,Prediksi_Jarak,Prediksi_Debit,Prediksi_Status\n" + csv.join("\n");
             let encodedUri = encodeURI(csvContent);
             let link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "dataset_banjir_unib.csv");
+            link.setAttribute("download", "dataset_banjir_dan_prediksi_ann.csv");
             document.body.appendChild(link);
             
-            link.click(); // Eksekusi download file
+            link.click();
             document.body.removeChild(link);
         }
     </script>
