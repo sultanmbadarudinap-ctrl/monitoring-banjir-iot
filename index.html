@@ -110,11 +110,59 @@
             border-bottom: 2px solid #e3f2fd;
             padding-bottom: 12px;
             margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 15px;
         }
 
         .riwayat-header-tombol {
             display: flex;
             gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        /* FITUR SLIDE PER HARI (PAGINATION TANGGAL) */
+        .slide-nav-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: #f8f9fa;
+            padding: 12px 18px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .slide-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-nav-slide {
+            background-color: #0288d1;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-nav-slide:hover {
+            background-color: #01579b;
+        }
+
+        .input-date-slide {
+            padding: 7px 10px;
+            border: 1px solid #b0bec5;
+            border-radius: 6px;
+            font-weight: bold;
+            color: #37474f;
+            outline: none;
         }
 
         /* DESAIN TOMBOL INTERAKTIF */
@@ -134,7 +182,7 @@
         }
 
         .btn-download:hover {
-            background-color: #1b5e20; /* Hijau lebih gelap saat disentuh mouse */
+            background-color: #1b5e20;
         }
 
         .btn-delete {
@@ -153,7 +201,7 @@
         }
 
         .btn-delete:hover {
-            background-color: #c62828; /* Merah lebih gelap saat disentuh mouse */
+            background-color: #c62828;
         }
 
         /* Desain Tabel Log Data */
@@ -168,7 +216,7 @@
 
         th, td {
             padding: 12px 10px;
-            text-align: center; /* Diposisikan di tengah agar seimbang */
+            text-align: center;
             border-bottom: 1px solid #e0e0e0;
             font-size: 0.9rem;
         }
@@ -180,7 +228,6 @@
             border: 1px solid #e0e0e0;
         }
 
-        /* Pembeda visual warna header kolom prediksi */
         th.header-prediksi {
             background-color: #e8f5e9;
             color: #1b5e20;
@@ -246,11 +293,25 @@
                 </div>
             </div>
             
+            <!-- PANEL SLIDE NAVIGASI TANGGAL (PER HARI) -->
+            <div class="slide-nav-container">
+                <div class="slide-controls">
+                    <button class="btn-nav-slide" onclick="gantiSlideHari(-1)">◀ Hari Sebelumnya</button>
+                    <input type="date" id="selectTanggalSlide" class="input-date-slide" onchange="filterTanggalManual()">
+                    <button class="btn-nav-slide" onclick="gantiSlideHari(1)">Hari Berikutnya ▶</button>
+                </div>
+                <div>
+                    <button class="btn-nav-slide" style="background-color: #546e7a;" onclick="tampilkanSemuaData()">🌐 Tampilkan Semua Data</button>
+                    <span id="infoTotalData" style="font-weight: bold; margin-left: 10px; color: #0d47a1;">Total: 0 Paket</span>
+                </div>
+            </div>
+            
             <div class="table-responsive">
                 <table id="tabelDataBanjir">
                     <thead>
                         <!-- Baris Grup Header Utama -->
                         <tr>
+                            <th rowspan="2" style="width: 50px;">No.</th>
                             <th rowspan="2">Waktu Transmisi</th>
                             <th colspan="3">DATA AKTUAL SENSOR (SEKARANG)</th>
                             <th colspan="3" class="header-prediksi">PREDIKSI TRIPLE-MODEL ANN (15 MENIT KE DEPAN)</th>
@@ -274,9 +335,6 @@
     </div>
 
     <script>
-        // ====================================================================
-        // SILAKAN TEMPEL KONFIGURASI WEB API FIREBASE MILIKMU DI SINI
-        // ====================================================================
         const firebaseConfig = {
             apiKey: "AIzaSyB2qnCoYr_ZyU2ry2XLSgUJhYYruyCleno",
             authDomain: "monitoring-banjir-iot-c4f61.firebaseapp.com",
@@ -287,64 +345,99 @@
             appId: "1:706382246075:web:07d230e7ea9b6dba86f99e"
         };
 
-        // Inisialisasi Firebase
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // Object lokal untuk melacak pemetaan waktu agar tidak berubah saat data ter-update
-        const petaWaktuBaris = {};
+        // Object Penyimpanan Lokal Seluruh Data
+        let databaseLokal = {};
+        let tanggalAktif = getFormattedToday();
 
-        // ====================================================================
-        // FUNGSI PEMBANTU: MENENTUKAN STRING WAKTU PERMANEN
-        // ====================================================================
-        function dapatkanWaktuFormat(data, key) {
-            // 1. Jika di Firebase ada field 'waktu' atau 'jam'
-            if (data.waktu) return data.waktu;
-            if (data.jam) return data.jam;
+        // Set default input tanggal ke hari ini
+        document.getElementById('selectTanggalSlide').value = tanggalAktif;
 
-            // 2. Jika di Firebase ada field 'timestamp' (Unix millis atau String Date)
-            if (data.timestamp) {
-                const d = new Date(data.timestamp);
-                if (!isNaN(d.getTime())) {
-                    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
-                }
-            }
-
-            // 3. EKSTRAK WAKTU ASLI DARI ID PUSH FIREBASE (Key '-NxY128a...')
-            try {
-                const PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
-                let time = 0;
-                for (let i = 0; i < 8; i++) {
-                    time = (time * 64) + PUSH_CHARS.indexOf(key.charAt(i));
-                }
-                const dateFromKey = new Date(time);
-                
-                // Validasi jika dekode key menghasilkan tanggal yang valid
-                if (!isNaN(dateFromKey.getTime()) && dateFromKey.getFullYear() >= 2024) {
-                    const jam = dateFromKey.getHours().toString().padStart(2, '0');
-                    const menit = dateFromKey.getMinutes().toString().padStart(2, '0');
-                    const detik = dateFromKey.getSeconds().toString().padStart(2, '0');
-                    return `${jam}:${menit}:${detik}`;
-                }
-            } catch (e) {
-                // Abaikan jika key bukan format push ID standar
-            }
-
-            // 4. Jika sudah pernah disimpan di memori lokal petaWaktuBaris (karena sesi web aktif)
-            if (petaWaktuBaris[key]) return petaWaktuBaris[key];
-
-            // 5. Fallback: Buat waktu baru saat pertama kali data terdeteksi
-            const sekarang = new Date();
-            const waktuBaru = `${sekarang.getHours().toString().padStart(2, '0')}:${sekarang.getMinutes().toString().padStart(2, '0')}:${sekarang.getSeconds().toString().padStart(2, '0')}`;
-            petaWaktuBaris[key] = waktuBaru;
-            return waktuBaru;
+        function getFormattedToday() {
+            const d = new Date();
+            const yyyy = d.getFullYear();
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd}`;
         }
 
         // ====================================================================
-        // FUNGSI UTAMA UNTUK MERENDER ATAU MEMPERBARUI BARIS TABEL DAN CARD
+        // EKSTRAKSI WAKTU DAN TANGGAL
         // ====================================================================
-        function perbaruiTampilanWeb(key, data, isUpdateOnly = false) {
-            // --- A1. UPDATE TAMPILAN KARTU DATA AKTUAL SENSOR ---
+        function ekstraksiWaktuDanTanggal(data, key) {
+            let dateObj = null;
+
+            if (data.timestamp) {
+                dateObj = new Date(data.timestamp);
+            } else {
+                try {
+                    const PUSH_CHARS = '-0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_abcdefghijklmnopqrstuvwxyz';
+                    let time = 0;
+                    for (let i = 0; i < 8; i++) {
+                        time = (time * 64) + PUSH_CHARS.indexOf(key.charAt(i));
+                    }
+                    const d = new Date(time);
+                    if (!isNaN(d.getTime()) && d.getFullYear() >= 2024) {
+                        dateObj = d;
+                    }
+                } catch (e) {}
+            }
+
+            if (!dateObj || isNaN(dateObj.getTime())) {
+                dateObj = new Date();
+            }
+
+            const yyyy = dateObj.getFullYear();
+            const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateObj.getDate()).padStart(2, '0');
+            const tglStr = `${yyyy}-${mm}-${dd}`;
+
+            const hh = String(dateObj.getHours()).padStart(2, '0');
+            const min = String(dateObj.getMinutes()).padStart(2, '0');
+            const ss = String(dateObj.getSeconds()).padStart(2, '0');
+            const jamStr = data.waktu || data.jam || `${hh}:${min}:${ss}`;
+
+            return { tanggal: tglStr, waktu: jamStr, datetime: dateObj };
+        }
+
+        // ====================================================================
+        // MEMUAT DATA FIREBASE & LISTEN REAL-TIME
+        // ====================================================================
+        const referensiData = db.ref('/riwayat_monitoring');
+
+        referensiData.on('child_added', (snapshot) => {
+            const key = snapshot.key;
+            const data = snapshot.val();
+            const infoWaktu = ekstraksiWaktuDanTanggal(data, key);
+
+            databaseLokal[key] = {
+                data: data,
+                tanggal: infoWaktu.tanggal,
+                waktu: infoWaktu.waktu,
+                datetime: infoWaktu.datetime
+            };
+
+            // Update Kartu Real-time untuk data paling baru
+            updateKartuMonitoring(data);
+            renderTabelDashboard();
+        });
+
+        referensiData.on('child_changed', (snapshot) => {
+            const key = snapshot.key;
+            const data = snapshot.val();
+            if (databaseLokal[key]) {
+                databaseLokal[key].data = data;
+                updateKartuMonitoring(data);
+                renderTabelDashboard();
+            }
+        });
+
+        // ====================================================================
+        // UPDATE KARTU REALTIME DI ATAS
+        // ====================================================================
+        function updateKartuMonitoring(data) {
             if (document.getElementById("txtJarak")) {
                 document.getElementById("txtJarak").innerText = data.jarak == -1.0 ? "--- cm" : data.jarak.toFixed(1) + " cm";
             }
@@ -361,7 +454,6 @@
                 else { elStatus.style.color = "#757575"; }
             }
 
-            // --- A2. UPDATE TAMPILAN KARTU PREDIKSI ANN ---
             const elPredJarak = document.getElementById("txtPrediksiJarak");
             const elPredDebit = document.getElementById("txtPrediksiDebit");
             const elPredStatus = document.getElementById("txtPrediksiStatus");
@@ -383,98 +475,116 @@
                     elPredStatus.style.color = "#757575";
                 }
             }
-
-            // --- B. MANIPULASI BARIS PADA TABEL RIWAYAT ---
-            const tabel = document.getElementById("bodyTabelRiwayat");
-            if (tabel) {
-                let barisSedia = document.getElementById("row-" + key);
-                const waktuStatis = dapatkanWaktuFormat(data, key);
-                
-                if (barisSedia) {
-                    // JIKA BARIS SUDAH ADA: Perbarui data tanpa mengubah waktu awal
-                    barisSedia.cells[0].innerText = waktuStatis; // Pastikan waktu tetap terkunci
-                    barisSedia.cells[4].innerText = (data.prediksi_jarak !== undefined) ? data.prediksi_jarak.toFixed(1) + " cm" : "Menghitung...";
-                    barisSedia.cells[5].innerText = (data.prediksi_debit !== undefined) ? data.prediksi_debit.toFixed(1) + " L/menit" : "Menghitung...";
-                    
-                    const cellPredStatusCol = barisSedia.cells[6];
-                    if (data.prediksi_status !== undefined) {
-                        cellPredStatusCol.innerText = data.prediksi_status;
-                        cellPredStatusCol.style.fontWeight = "bold";
-                        if (data.prediksi_status === "BAHAYA") { cellPredStatusCol.style.color = "red"; }
-                        else if (data.prediksi_status === "WASPADA") { cellPredStatusCol.style.color = "orange"; }
-                        else { cellPredStatusCol.style.color = "green"; }
-                    } else {
-                        cellPredStatusCol.innerText = "Antre CPU...";
-                        cellPredStatusCol.style.color = "#757575";
-                    }
-                } else if (!isUpdateOnly) {
-                    // JIKA BARIS BELUM ADA DAN BUKAN EVENT UPDATE: Buat baris baru di posisi teratas
-                    const barisBaru = tabel.insertRow(0);
-                    barisBaru.id = "row-" + key; // Beri ID unik agar baris ini bisa dicari dan di-patch nanti
-
-                    // 1. Kolom Waktu Transmisi (Menggunakan Waktu Dekode ID Firebase / Timestamp)
-                    barisBaru.insertCell(0).innerText = waktuStatis;
-                    
-                    // 2. Kolom Ketinggian Aktual
-                    barisBaru.insertCell(1).innerText = data.jarak == -1.0 ? "--- cm (Blind Spot)" : data.jarak.toFixed(1) + " cm";
-                    
-                    // 3. Kolom Debit Aktual
-                    barisBaru.insertCell(2).innerText = data.debit.toFixed(1) + " L/menit";
-                    
-                    // 4. Kolom Status Aktual
-                    const cellStatus = barisBaru.insertCell(3);
-                    cellStatus.innerText = data.status;
-                    if (data.status === "BAHAYA") { 
-                        cellStatus.style.color = "red"; 
-                        cellStatus.style.fontWeight = "bold";
-                    } else if (data.status === "WASPADA") { 
-                        cellStatus.style.color = "orange"; 
-                        cellStatus.style.fontWeight = "bold";
-                    } else { 
-                        cellStatus.style.color = "green"; 
-                    }
-
-                    // 5. Kolom Estimasi Jarak ANN (Prediksi)
-                    const cellPredJarakCol = barisBaru.insertCell(4);
-                    cellPredJarakCol.className = "kolom-prediksi";
-                    cellPredJarakCol.innerText = (data.prediksi_jarak !== undefined) ? data.prediksi_jarak.toFixed(1) + " cm" : "Menghitung...";
-
-                    // 6. Kolom Estimasi Debit ANN (Prediksi)
-                    const cellPredDebitCol = barisBaru.insertCell(5);
-                    cellPredDebitCol.className = "kolom-prediksi";
-                    cellPredDebitCol.innerText = (data.prediksi_debit !== undefined) ? data.prediksi_debit.toFixed(1) + " L/menit" : "Menghitung...";
-
-                    // 7. Kolom Estimasi Status ANN (Prediksi)
-                    const cellPredStatusCol = barisBaru.insertCell(6);
-                    cellPredStatusCol.className = "kolom-prediksi";
-                    if (data.prediksi_status !== undefined) {
-                        cellPredStatusCol.innerText = data.prediksi_status;
-                        cellPredStatusCol.style.fontWeight = "bold";
-                        if (data.prediksi_status === "BAHAYA") { cellPredStatusCol.style.color = "red"; }
-                        else if (data.prediksi_status === "WASPADA") { cellPredStatusCol.style.color = "orange"; }
-                        else { cellPredStatusCol.style.color = "green"; }
-                    } else {
-                        cellPredStatusCol.innerText = "Antre CPU...";
-                        cellPredStatusCol.style.color = "#757575";
-                    }
-                }
-            }
         }
 
         // ====================================================================
-        // EVENT LISTENER DUA ARAH & LOADING DATA HISTORIS (MEMUAT 20 DATA TERAKHIR)
+        // RENDER TABEL & HITUNG PENOMORAN (NO.) PER SLIDE
         // ====================================================================
-        const referensiData = db.ref('/riwayat_monitoring').limitToLast(20);
-        
-        // 1. Mendeteksi masuknya Transaksi Data Baru & memuat riwayat tersimpan saat halaman dibuka
-        referensiData.on('child_added', (snapshot) => {
-            perbaruiTampilanWeb(snapshot.key, snapshot.val(), false);
-        });
+        function renderTabelDashboard() {
+            const bodyTabel = document.getElementById("bodyTabelRiwayat");
+            bodyTabel.innerHTML = "";
 
-        // 2. Mendeteksi Update Prediksi ANN dari Google Colab (Mencegah Lagging Tampilan!)
-        referensiData.on('child_changed', (snapshot) => {
-            perbaruiTampilanWeb(snapshot.key, snapshot.val(), true);
-        });
+            // Convert ke Array & Sort berdasarkan waktu terlama -> terbaru
+            let keys = Object.keys(databaseLokal);
+            let listData = keys.map(k => databaseLokal[k]);
+            listData.sort((a, b) => a.datetime - b.datetime);
+
+            // Filter berdasarkan tanggal aktif
+            let listFiltered = listData;
+            if (tanggalAktif !== 'ALL') {
+                listFiltered = listData.filter(item => item.tanggal === tanggalAktif);
+            }
+
+            // Update info total paket
+            document.getElementById('infoTotalData').innerText = `Total: ${listFiltered.length} Paket`;
+
+            // Tampilkan data terbaru paling atas (Descending)
+            let dataTampil = [...listFiltered].reverse();
+
+            dataTampil.forEach((item, index) => {
+                // Penomoran Urut (Nomor Data ke-X)
+                let nomorUrut = dataTampil.length - index; 
+
+                let baris = bodyTabel.insertRow();
+                const d = item.data;
+
+                // 1. Kolom No
+                let cellNo = baris.insertCell(0);
+                cellNo.innerText = nomorUrut;
+                cellNo.style.fontWeight = "bold";
+
+                // 2. Kolom Waktu
+                baris.insertCell(1).innerText = (tanggalAktif === 'ALL' ? item.tanggal + " " : "") + item.waktu;
+
+                // 3. Kolom Jarak
+                baris.insertCell(2).innerText = d.jarak == -1.0 ? "--- cm (Blind Spot)" : d.jarak.toFixed(1) + " cm";
+
+                // 4. Kolom Debit
+                baris.insertCell(3).innerText = d.debit.toFixed(1) + " L/menit";
+
+                // 5. Kolom Status
+                let cellStatus = baris.insertCell(4);
+                cellStatus.innerText = d.status;
+                cellStatus.style.fontWeight = "bold";
+                if (d.status === "BAHAYA") cellStatus.style.color = "red";
+                else if (d.status === "WASPADA") cellStatus.style.color = "orange";
+                else cellStatus.style.color = "green";
+
+                // 6. Kolom Prediksi Jarak
+                let cellPJarak = baris.insertCell(5);
+                cellPJarak.className = "kolom-prediksi";
+                cellPJarak.innerText = (d.prediksi_jarak !== undefined) ? d.prediksi_jarak.toFixed(1) + " cm" : "Menghitung...";
+
+                // 7. Kolom Prediksi Debit
+                let cellPDebit = baris.insertCell(6);
+                cellPDebit.className = "kolom-prediksi";
+                cellPDebit.innerText = (d.prediksi_debit !== undefined) ? d.prediksi_debit.toFixed(1) + " L/menit" : "Menghitung...";
+
+                // 8. Kolom Prediksi Status
+                let cellPStatus = baris.insertCell(7);
+                cellPStatus.className = "kolom-prediksi";
+                if (d.prediksi_status !== undefined) {
+                    cellPStatus.innerText = d.prediksi_status;
+                    cellPStatus.style.fontWeight = "bold";
+                    if (d.prediksi_status === "BAHAYA") cellPStatus.style.color = "red";
+                    else if (d.prediksi_status === "WASPADA") cellPStatus.style.color = "orange";
+                    else cellPStatus.style.color = "green";
+                } else {
+                    cellPStatus.innerText = "Antre CPU...";
+                    cellPStatus.style.color = "#757575";
+                }
+            });
+        }
+
+        // ====================================================================
+        // LOGIKA KONTROL SLIDE PER HARI (NAVIGASI)
+        // ====================================================================
+        function filterTanggalManual() {
+            const val = document.getElementById('selectTanggalSlide').value;
+            if (val) {
+                tanggalAktif = val;
+                renderTabelDashboard();
+            }
+        }
+
+        function gantiSlideHari(deltaHari) {
+            let dateBase = (tanggalAktif === 'ALL') ? new Date() : new Date(tanggalAktif);
+            dateBase.setDate(dateBase.getDate() + deltaHari);
+
+            const yyyy = dateBase.getFullYear();
+            const mm = String(dateBase.getMonth() + 1).padStart(2, '0');
+            const dd = String(dateBase.getDate()).padStart(2, '0');
+            tanggalAktif = `${yyyy}-${mm}-${dd}`;
+
+            document.getElementById('selectTanggalSlide').value = tanggalAktif;
+            renderTabelDashboard();
+        }
+
+        function tampilkanSemuaData() {
+            tanggalAktif = 'ALL';
+            document.getElementById('selectTanggalSlide').value = '';
+            renderTabelDashboard();
+        }
 
         // ====================================================================
         // FUNGSI KHUSUS UNTUK MENGHAPUS SELURUH RIWAYAT DI FIREBASE
@@ -486,7 +596,8 @@
                 db.ref('/riwayat_monitoring').remove()
                     .then(() => {
                         alert("🗑️ Sukses: Seluruh data riwayat di Firebase telah dihapus.");
-                        document.getElementById("bodyTabelRiwayat").innerHTML = "";
+                        databaseLokal = {};
+                        renderTabelDashboard();
                     })
                     .catch((error) => {
                         alert("❌ Gagal menghapus data: " + error.message);
@@ -501,7 +612,6 @@
             let csv = [];
             let rows = document.querySelectorAll("#tabelDataBanjir tr");
             
-            // Loop baris tabel (Mulai indeks ke-1 agar mengabaikan header grup bertingkat agar rapi)
             for (let i = 1; i < rows.length; i++) {
                 let row = [], cols = rows[i].querySelectorAll("td, th");
                 
@@ -512,11 +622,11 @@
                 csv.push(row.join(","));
             }
 
-            let csvContent = "data:text/csv;charset=utf-8,Waktu_Transmisi,Jarak_Aktual,Debit_Aktual,Status_Aktual,Prediksi_Jarak,Prediksi_Debit,Prediksi_Status\n" + csv.join("\n");
+            let csvContent = "data:text/csv;charset=utf-8,No,Waktu_Transmisi,Jarak_Aktual,Debit_Aktual,Status_Aktual,Prediksi_Jarak,Prediksi_Debit,Prediksi_Status\n" + csv.join("\n");
             let encodedUri = encodeURI(csvContent);
             let link = document.createElement("a");
             link.setAttribute("href", encodedUri);
-            link.setAttribute("download", "dataset_banjir_dan_prediksi_ann.csv");
+            link.setAttribute("download", `dataset_banjir_${tanggalAktif}.csv`);
             document.body.appendChild(link);
             
             link.click();
